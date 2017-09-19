@@ -3,17 +3,12 @@ module Validation
         ( ValidationResult(..)
         , andMap
         , andThen
-        , fromMaybe
-        , fromMaybeInitial
-        , fromResult
-        , fromResultInitial
         , initial
         , isInvalid
         , isValid
         , map
         , mapMessage
         , message
-        , toMaybe
         , toString
         , valid
         , validate
@@ -154,11 +149,6 @@ applied `ValidationResult`s.
 
 ## Converting
 
-@docs fromMaybeInitial
-@docs fromMaybe
-@docs toMaybe
-@docs fromResultInitial
-@docs fromResult
 @docs toString
 
 -}
@@ -172,7 +162,7 @@ applied `ValidationResult`s.
 
 -}
 type ValidationResult val
-    = Initial
+    = Initial val
     | Valid val
     | Invalid String String
 
@@ -182,8 +172,8 @@ type ValidationResult val
 map : (a -> b) -> ValidationResult a -> ValidationResult b
 map fn validation =
     case validation of
-        Initial ->
-            Initial
+        Initial val ->
+            Initial (fn val)
 
         Valid val ->
             Valid (fn val)
@@ -209,8 +199,8 @@ mapMessage fn validation =
 andThen : (a -> ValidationResult b) -> ValidationResult a -> ValidationResult b
 andThen fn validation =
     case validation of
-        Initial ->
-            Initial
+        Initial val ->
+            fn val
 
         Valid val ->
             fn val
@@ -228,8 +218,8 @@ ValidationResult. See the example above.
 andMap : ValidationResult a -> ValidationResult (a -> b) -> ValidationResult b
 andMap validation validationFn =
     case validationFn of
-        Initial ->
-            Initial
+        Initial fn ->
+            map fn validation
 
         Valid fn ->
             map fn validation
@@ -247,7 +237,7 @@ valid =
 
 {-| Initialize a ValidationResult to the empty case (no input).
 -}
-initial : ValidationResult val
+initial : val -> ValidationResult val
 initial =
     Initial
 
@@ -257,79 +247,14 @@ initial =
 withDefault : val -> ValidationResult val -> val
 withDefault default validation =
     case validation of
+        Initial val ->
+            val
+
         Valid val ->
             val
 
-        _ ->
+        Invalid _ _ ->
             default
-
-
-{-| Convert a `Maybe` into either `Initial` (if `Nothing`) or `Valid` (if `Just`)
--}
-fromMaybeInitial : Maybe val -> ValidationResult val
-fromMaybeInitial maybe =
-    case maybe of
-        Nothing ->
-            Initial
-
-        Just val ->
-            Valid val
-
-
-{-| Convert a `Maybe` into either `Invalid`, with given message and input, or `Valid`.
--}
-fromMaybe : String -> String -> Maybe val -> ValidationResult val
-fromMaybe msg input maybe =
-    case maybe of
-        Nothing ->
-            Invalid msg input
-
-        Just val ->
-            Valid val
-
-
-{-| Convert a `ValidationResult` to a `Maybe`. Note `Invalid` state is dropped.
--}
-toMaybe : ValidationResult val -> Maybe val
-toMaybe validation =
-    case validation of
-        Valid val ->
-            Just val
-
-        _ ->
-            Nothing
-
-
-{-| Convert a `Result` into either `Initial` (if `Err`) or `Valid` (if `Ok`).
-Note `Err` state is dropped.
--}
-fromResultInitial : Result msg val -> ValidationResult val
-fromResultInitial result =
-    case result of
-        Ok val ->
-            Valid val
-
-        Err _ ->
-            Initial
-
-
-{-| Convert a `Result` into either `Invalid`, using given function mapping the `Err`
-value to the error message (`String`), and the given input string; or `Valid`.
-
-Note: this function may be useful for unusual scenarios where you have a
-Result already and you need to convert it. More typically you would pass
-a Result-returning function to `validate` &mdash; which calls `fromResult`
-internally.
-
--}
-fromResult : (msg -> String) -> String -> Result msg val -> ValidationResult val
-fromResult fn input result =
-    case result of
-        Ok val ->
-            Valid val
-
-        Err msg ->
-            Invalid (fn msg) input
 
 
 {-| Convert the ValidationResult to a String representation:
@@ -345,8 +270,8 @@ attribute of an `Html.input` element.
 toString : (val -> String) -> ValidationResult val -> String
 toString fn validation =
     case validation of
-        Initial ->
-            ""
+        Initial val ->
+            fn val
 
         Valid val ->
             fn val
@@ -404,9 +329,9 @@ So a validation function for "integer less than 10" looks like:
     lessThanTen input =
         String.toInt input
             |> Result.andThen
-                (\i ->
+                (\int ->
                     if i < 10 then
-                        Ok i
+                        Ok int
                     else
                         Err "Must be less than 10"
                 )
