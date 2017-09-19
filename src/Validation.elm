@@ -22,7 +22,7 @@ There are various ways of using the tools this library provides. The recommended
 way is to _store ValidationResult state in your model_, in much the same way
 as you store [RemoteData] in your model.
 
-This means your _form_ model is separate from the _underlying, validated
+This means your _form_ model is separate from the _validated
 data_ model, and you typically need to map the form into the validated model
 (see example below).
 
@@ -47,9 +47,9 @@ First, define a form model with the field to be validated wrapped in a
 
 In your view,
 
-1.  pipe input through a validation function and into your update;
-2.  set the value to either the validated or the last-entered input; and
-3.  display any error message below the input element.
+1.  pipe input through a validation function and into your update
+2.  set the value to either the validated or the last-entered input
+3.  display any error message below the input element
 
 ```
 view : Model -> Html Msg
@@ -58,16 +58,10 @@ view form =
     div []
         [ input
             [ type_ "text"
-            , value
-                (form.input
-                    |> Validation.toString identity
-                )
+            , value (Validation.toString identity form.input)
 
             -- (2.)
-            , onInput
-                (Validation.validate isRequired
-                    >> SetInput
-                )
+            , onInput (SetInput << Validation.validate isRequired)
 
             -- (1.)
             ]
@@ -75,9 +69,7 @@ view form =
         , div
             [ class "error" ]
             [ text
-                (Validation.message form.input
-                    |> Maybe.withDefault ""
-                )
+                (Maybe.withDefault "" <| Validation.message form.input)
 
             -- (3.)
             ]
@@ -87,14 +79,14 @@ view form =
 (Note: often you will want an `onBlur` event as well, but this is left as an
 exercise for the reader.)
 
-Your validation functions are defined as `a -> Result String a`:
+Your validation functions are defined as `val -> Result String val`:
 
     isRequired : String -> Result String String
-    isRequired raw =
-        if String.length raw < 1 then
+    isRequired str =
+        if String.length str < 1 then
             Err "Required"
         else
-            Ok raw
+            Ok str
 
 
 ## Combining validation results
@@ -156,7 +148,7 @@ applied `ValidationResult`s.
 
 {-| A wrapped value has three states:
 
-  - `Initial` - No input yet.
+  - `Initial` - Input is initial, and here is the initial data.
   - `Valid` - Input is valid, and here is the valid (parsed) data.
   - `Invalid` - Input is invalid, and here is the error message and your last input.
 
@@ -167,7 +159,7 @@ type ValidationResult val
     | Invalid String String
 
 
-{-| Map a function into the `Valid` value.
+{-| Map a function into the `Initial` and `Valid` value.
 -}
 map : (a -> b) -> ValidationResult a -> ValidationResult b
 map fn validation =
@@ -182,7 +174,7 @@ map fn validation =
             Invalid msg input
 
 
-{-| Map over the error message value, producing a new ValidationResult
+{-| Map over the error message value.
 -}
 mapMessage : (String -> String) -> ValidationResult val -> ValidationResult val
 mapMessage fn validation =
@@ -194,7 +186,7 @@ mapMessage fn validation =
             validation
 
 
-{-| Chain a function returning ValidationResult onto a ValidationResult
+{-| Chain a function returning ValidationResult onto a ValidationResult.
 -}
 andThen : (a -> ValidationResult b) -> ValidationResult a -> ValidationResult b
 andThen fn validation =
@@ -235,14 +227,14 @@ valid =
     Valid
 
 
-{-| Initialize a ValidationResult to the empty case (no input).
+{-| Put a initial value into ValidationResult.
 -}
 initial : val -> ValidationResult val
 initial =
     Initial
 
 
-{-| Extract the `Valid` value, or the given default
+{-| Extract the `Initial` and `Valid` value, or the given default
 -}
 withDefault : val -> ValidationResult val -> val
 withDefault default validation =
@@ -259,9 +251,9 @@ withDefault default validation =
 
 {-| Convert the ValidationResult to a String representation:
 
+  - if Initial, convert the initial value to a string with the given function.
   - if Valid, convert the value to a string with the given function;
   - if Invalid, return the input (unvalidated) string;
-  - if Initial, return the empty string ("").
 
 Note: this is mainly useful as a convenience function for setting the `value`
 attribute of an `Html.input` element.
@@ -320,8 +312,8 @@ isInvalid validation =
 
 {-| Run a validation function on an input string, to create a ValidationResult.
 
-Note the validation function you provide is `String -> Result String a`, where
-`a` is the type of the valid value.
+Note the validation function you provide is `String -> Result String val`, where
+`val` is the type of the valid value.
 
 So a validation function for "integer less than 10" looks like:
 
